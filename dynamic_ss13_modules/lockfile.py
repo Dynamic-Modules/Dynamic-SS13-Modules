@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +38,6 @@ def build_lockfile(host: HostConfig, graph: ResolvedGraph) -> dict[str, Any]:
         }
     return {
         "lockfile_version": LOCKFILE_VERSION,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "modules": modules,
     }
 
@@ -62,4 +60,3 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
         return True
     except ValueError:
         return False
-
