@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dynamic SS13 Modules Lockfile",
+  "type": "object",
+  "required": ["lockfile_version", "modules"],
+  "properties": {
+    "lockfile_version": { "type": "integer" },
+    "generated_at": { "type": "string" },
+    "modules": { "type": "object" }
+  }
+}
+

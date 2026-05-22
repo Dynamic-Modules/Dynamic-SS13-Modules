@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "trip_chance": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "messages": {
+      "type": "object"
+    }
+  }
+}
+

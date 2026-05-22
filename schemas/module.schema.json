@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dynamic SS13 Module Manifest",
+  "type": "object",
+  "required": ["id", "name", "version", "module_api"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "module_api": { "type": "string" },
+    "description": { "type": "string" },
+    "source": { "type": "object" },
+    "compat": { "type": "object" },
+    "load": { "type": "object" },
+    "build": { "type": "object" },
+    "config": { "type": "object" },
+    "hooks": { "type": "array" },
+    "patches": { "type": "array" }
+  }
+}
+

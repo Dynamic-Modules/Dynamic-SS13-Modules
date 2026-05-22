@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dynamic-ss13-modules"
+version = "0.1.0"
+description = "Build-time dynamic module manager for tg-style SS13 downstreams."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0-or-later" }
+authors = [
+  { name = "Dynamic SS13 Modules maintainers" },
+]
+dependencies = [
+  "jsonschema>=4.0",
+]
+
+[project.scripts]
+dynamic-modules = "dynamic_ss13_modules.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dynamic_ss13_modules*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dynamic SS13 Modules Host Config",
+  "type": "object",
+  "properties": {
+    "module_roots": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "config_dir": { "type": "string" },
+    "lockfile": { "type": "string" },
+    "build": { "type": "object" },
+    "registries": { "type": "array" },
+    "update": { "type": "object" }
+  }
+}
+

@@ -1,0 +1,43 @@
+id = "trip-system"
+name = "Trip System"
+version = "1.0.0"
+module_api = "1"
+description = "Example module that adds a tripping hook."
+
+[source]
+repo = "https://github.com/example/trip-system.git"
+default_branch = "main"
+
+[compat]
+target = "tgstation"
+minimum_dynamic_modules = "0.1.0"
+
+[load]
+load_after = ["movement-hooks"]
+
+[build]
+dm_files = ["code/**/*.dm"]
+test_files = ["tests/**/*.dm"]
+
+[config]
+schema = "config/config.schema.json"
+defaults = "config/default.toml"
+version = 1
+
+[[hooks]]
+id = "human-movement-trip-check"
+target = "/mob/living/carbon/human/proc/Move"
+target_file = "code/modules/mob/living/carbon/human/human_movement.dm"
+mode = "generated_hook"
+file = "hooks/human_movement_trip_check.dm"
+description = "Runs the trip check from the movement hook."
+
+[[patches]]
+id = "legacy-human-move-anchor"
+target_file = "code/modules/mob/living/carbon/human/human_movement.dm"
+mode = "insert_after"
+anchor = ". = ..()"
+file = "patches/human_move_trip_check.dm"
+occurrence = 1
+risk = "escape_hatch"
+

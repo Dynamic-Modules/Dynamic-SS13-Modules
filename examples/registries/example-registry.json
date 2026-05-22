@@ -1,0 +1,12 @@
+{
+  "modules": {
+    "trip-system": {
+      "name": "Trip System",
+      "repo": "https://github.com/example/trip-system.git",
+      "description": "Example module that adds a tripping hook.",
+      "compat": ["tgstation"],
+      "latest_version": "1.0.0"
+    }
+  }
+}
+
