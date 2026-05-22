@@ -1,5 +1,12 @@
 {
   "modules": {
+    "example-dynamic-module": {
+      "name": "Example Dynamic Module",
+      "repo": "https://github.com/CatoChristopherMrow/Example-Dynamic-SS13-Module.git",
+      "description": "External example module used for end-to-end Dynamic SS13 Modules testing.",
+      "compat": ["tgstation"],
+      "latest_version": "1.0.0"
+    },
     "trip-system": {
       "name": "Trip System",
       "repo": "https://github.com/example/trip-system.git",
@@ -9,4 +16,3 @@
     }
   }
 }
-

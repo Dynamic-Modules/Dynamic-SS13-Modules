@@ -5,9 +5,23 @@
 The intended production path is Git submodules plus a lockfile:
 
 ```bash
-git submodule add https://github.com/example/trip-system.git dynamic_modules/installed/trip-system
-dynamic-modules resolve --write-lock
-dynamic-modules prepare
+dynamic-modules module add example-dynamic-module
+```
+
+or with an explicit repository:
+
+```bash
+dynamic-modules module add example-dynamic-module \
+  --repo https://github.com/CatoChristopherMrow/Example-Dynamic-SS13-Module.git
+```
+
+The command installs the repository as a submodule, resolves modules, writes the
+lockfile, and regenerates `.dynamic_modules_build/`.
+
+## Remove a module
+
+```bash
+dynamic-modules module remove example-dynamic-module
 ```
 
 ## Explain a file

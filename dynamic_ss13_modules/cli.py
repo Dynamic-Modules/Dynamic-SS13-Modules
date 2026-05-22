@@ -15,6 +15,7 @@ from dynamic_ss13_modules.git.updater import (
 )
 from dynamic_ss13_modules.lockfile import write_lockfile
 from dynamic_ss13_modules.manifest import discover_manifests, load_host_config
+from dynamic_ss13_modules.module_ops import install_module, remove_module
 from dynamic_ss13_modules.registry import load_registries
 from dynamic_ss13_modules.resolver import resolve_modules
 
@@ -59,6 +60,19 @@ def build_parser() -> argparse.ArgumentParser:
     _command(subparsers, "workspace-generate", "generate a VS Code multi-root workspace", cmd_workspace_generate)
     _command(subparsers, "test-plan", "print module unit-test include plan", cmd_test_plan)
     _command(subparsers, "registry-sync", "load and summarize allowlisted registries", cmd_registry_sync)
+    module = subparsers.add_parser("module", help="install or remove module submodules")
+    module_subparsers = module.add_subparsers(required=True)
+    module_add = _command(module_subparsers, "add", "install a module as a git submodule", cmd_module_add)
+    module_add.add_argument("module_id", help="module id to install")
+    module_add.add_argument("--repo", help="repository URL/path; when omitted, trusted registries are searched")
+    module_add.add_argument("--branch", help="branch to pass to git submodule add")
+    module_add.add_argument("--commit", help="commit to check out after adding")
+    module_add.add_argument("--path", help="destination path relative to host root")
+    module_add.add_argument("--no-prepare", action="store_true", help="do not regenerate lock/build output")
+    module_remove = _command(module_subparsers, "remove", "remove an installed module submodule", cmd_module_remove)
+    module_remove.add_argument("module_id", help="module id to remove")
+    module_remove.add_argument("--path", help="module path relative to host root")
+    module_remove.add_argument("--no-prepare", action="store_true", help="do not regenerate lock/build output")
     update = _command(subparsers, "update", "evaluate or apply git update candidates", cmd_update)
     update.add_argument("--apply", action="store_true", help="checkout selected update candidates")
     update.add_argument("--commit", action="store_true", help="commit updated modules and lockfile")
@@ -281,6 +295,39 @@ def cmd_registry_sync(args) -> int:
         modules = data.get("modules", {})
         count = len(modules) if isinstance(modules, dict) else 0
         print(f"{name}: {count} modules")
+    return 0
+
+
+def cmd_module_add(args) -> int:
+    host = load_host_config(
+        Path(args.root).resolve(), Path(args.config).resolve() if args.config else None
+    )
+    install_path = install_module(
+        host,
+        args.module_id,
+        repo=args.repo,
+        branch=args.branch,
+        commit=args.commit,
+        path=args.path,
+    )
+    print(f"installed {args.module_id} at {install_path}")
+    if not args.no_prepare:
+        host, _manifests, graph = _host(args)
+        prepare_build(host, graph, write_lock=True)
+        print(f"wrote {host.lockfile}")
+        print(f"generated {host.build.build_dir / 'index.json'}")
+    return 0
+
+
+def cmd_module_remove(args) -> int:
+    host, _manifests, graph = _host(args)
+    removed_path = remove_module(host, graph, args.module_id, path=args.path)
+    print(f"removed {args.module_id} from {removed_path}")
+    if not args.no_prepare:
+        host, _manifests, graph = _host(args)
+        prepare_build(host, graph, write_lock=True)
+        print(f"wrote {host.lockfile}")
+        print(f"generated {host.build.build_dir / 'index.json'}")
     return 0
 
 
