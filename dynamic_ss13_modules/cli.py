@@ -213,7 +213,11 @@ def cmd_preview_file(args) -> int:
     index = load_index(host.build.build_dir)
     key = _relative_key(index, args.file)
     interactions = index.get("files", {}).get(key, [])
-    patched = [item for item in interactions if item.get("kind") == "patch" and item.get("output_file")]
+    patched = [
+        item
+        for item in interactions
+        if item.get("kind") in {"patch", "module_patch"} and item.get("output_file")
+    ]
     if not patched:
         print(f"No materialized patch overlay recorded for {key}.")
         return 0
@@ -232,12 +236,14 @@ def cmd_patch_report(args) -> int:
     count = 0
     for file_name, interactions in sorted(index.get("files", {}).items()):
         for item in interactions:
-            if item.get("kind") != "patch":
+            if item.get("kind") not in {"patch", "module_patch"}:
                 continue
             count += 1
+            kind = item.get("kind")
             print(
                 f"{file_name}:{item.get('anchor_line')} "
-                f"{item.get('module')}:{item.get('id')} {item.get('mode')} risk={item.get('risk')}"
+                f"{kind} {item.get('module')}:{item.get('id')} "
+                f"{item.get('mode')} risk={item.get('risk')}"
             )
     if count == 0:
         print("No structured patches recorded.")

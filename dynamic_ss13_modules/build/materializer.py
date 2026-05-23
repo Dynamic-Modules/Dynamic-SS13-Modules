@@ -11,7 +11,7 @@ from dynamic_ss13_modules.errors import BuildError
 from dynamic_ss13_modules.errors import ValidationError as DynamicValidationError
 from dynamic_ss13_modules.io import merge_dicts, read_json, read_toml, write_json
 from dynamic_ss13_modules.lockfile import build_lockfile, write_lockfile
-from dynamic_ss13_modules.manifest.models import HostConfig, ModuleManifest
+from dynamic_ss13_modules.manifest.models import HostConfig, ModuleManifest, PatchSpec
 from dynamic_ss13_modules.patches.engine import AppliedPatch, apply_patch_text
 from dynamic_ss13_modules.paths import include_path
 from dynamic_ss13_modules.resolver.graph import ResolvedGraph
@@ -27,6 +27,27 @@ class PrepareResult:
     lockfile_written: bool
 
 
+@dataclass(frozen=True)
+class LocalModulePatch:
+    module_id: str
+    patch: PatchSpec
+    manifest_path: Path
+
+
+@dataclass(frozen=True)
+class AppliedModulePatch:
+    module_id: str
+    patch_id: str
+    target_file: str
+    source_file: str
+    output_file: str
+    mode: str
+    anchor: str
+    anchor_line: int
+    occurrence: int
+    risk: str
+
+
 def prepare_build(host: HostConfig, graph: ResolvedGraph, write_lock: bool = True) -> PrepareResult:
     build_dir = host.build.build_dir
     _assert_safe_build_dir(host.root, build_dir)
@@ -34,6 +55,7 @@ def prepare_build(host: HostConfig, graph: ResolvedGraph, write_lock: bool = Tru
         shutil.rmtree(build_dir)
     generated_dir = build_dir / "generated"
     patched_dir = build_dir / "patched"
+    module_patched_dir = build_dir / "module_patches"
     generated_dir.mkdir(parents=True, exist_ok=True)
 
     patch_output_dir = patched_dir
@@ -47,6 +69,15 @@ def prepare_build(host: HostConfig, graph: ResolvedGraph, write_lock: bool = Tru
 
     dm_files = _collect_files(graph, "dm")
     test_files = _collect_files(graph, "tests")
+    included_module_sources = {path.resolve() for _module, path in dm_files + test_files}
+    applied_module_patches, module_patch_outputs = _apply_local_module_patches(
+        host,
+        graph,
+        module_patched_dir,
+        included_module_sources,
+    )
+    dm_files = _rewrite_module_file_outputs(dm_files, module_patch_outputs)
+    test_files = _rewrite_module_file_outputs(test_files, module_patch_outputs)
     _write_include_file(include_file, dm_files, "Dynamic SS13 module source includes")
     _write_include_file(tests_file, test_files, "Dynamic SS13 module unit-test includes")
     write_json(config_file, _collect_config(host, graph))
@@ -58,6 +89,7 @@ def prepare_build(host: HostConfig, graph: ResolvedGraph, write_lock: bool = Tru
         dm_files=dm_files,
         test_files=test_files,
         applied_patches=applied_patches,
+        applied_module_patches=applied_module_patches,
         include_file=include_file,
         tests_file=tests_file,
         config_file=config_file,
@@ -112,6 +144,13 @@ def _collect_files(graph: ResolvedGraph, kind: str) -> list[tuple[ModuleManifest
     return collected
 
 
+def _rewrite_module_file_outputs(
+    files: list[tuple[ModuleManifest, Path]],
+    module_patch_outputs: dict[Path, Path],
+) -> list[tuple[ModuleManifest, Path]]:
+    return [(module, module_patch_outputs.get(path.resolve(), path)) for module, path in files]
+
+
 def _write_include_file(path: Path, files: list[tuple[ModuleManifest, Path]], title: str) -> None:
     lines = [
         f"// {title}",
@@ -150,6 +189,119 @@ def _collect_config(host: HostConfig, graph: ResolvedGraph) -> dict[str, Any]:
             "values": data,
         }
     return result
+
+
+def _load_local_module_patches(host: HostConfig) -> list[LocalModulePatch]:
+    patch_root = host.config_dir / "patches"
+    if not patch_root.exists():
+        return []
+    if not patch_root.is_dir():
+        raise BuildError(f"local module patch path is not a directory: {patch_root}")
+
+    local_patches: list[LocalModulePatch] = []
+    for manifest_path in sorted(patch_root.rglob("*.toml")):
+        data = read_toml(manifest_path)
+        patches_raw = data.get("patches", [])
+        if not isinstance(patches_raw, list):
+            raise BuildError(f"{manifest_path}: patches must be an array of tables")
+        for raw_patch in patches_raw:
+            if not isinstance(raw_patch, dict):
+                raise BuildError(f"{manifest_path}: patches entries must be tables")
+            module_id = raw_patch.get("module")
+            if not isinstance(module_id, str) or not module_id.strip():
+                raise BuildError(f"{manifest_path}: patch.module must be a non-empty string")
+            local_patches.append(
+                LocalModulePatch(
+                    module_id=module_id,
+                    patch=PatchSpec.from_raw(raw_patch, manifest_path),
+                    manifest_path=manifest_path,
+                )
+            )
+    return local_patches
+
+
+def _apply_local_module_patches(
+    host: HostConfig,
+    graph: ResolvedGraph,
+    module_patched_dir: Path,
+    included_module_sources: set[Path],
+) -> tuple[list[AppliedModulePatch], dict[Path, Path]]:
+    local_patches = _load_local_module_patches(host)
+    if not local_patches:
+        return [], {}
+
+    patches_by_module: dict[str, list[LocalModulePatch]] = {}
+    for local_patch in local_patches:
+        if local_patch.module_id not in graph.modules:
+            raise BuildError(
+                f"{local_patch.manifest_path}: local patch {local_patch.patch.id} "
+                f"targets unknown module {local_patch.module_id!r}"
+            )
+        patches_by_module.setdefault(local_patch.module_id, []).append(local_patch)
+
+    applied: list[AppliedModulePatch] = []
+    outputs_by_source: dict[Path, Path] = {}
+    buffers: dict[Path, str] = {}
+    host_root = host.root.resolve()
+    config_root = host.config_dir.resolve()
+
+    for module in graph.ordered_modules():
+        module_root = module.root.resolve()
+        for local_patch in patches_by_module.get(module.id, []):
+            patch = local_patch.patch
+            source_path = (module.root / patch.target_file).resolve()
+            patch_path = (local_patch.manifest_path.parent / patch.file).resolve()
+
+            if not source_path.exists():
+                raise BuildError(
+                    f"{module.id}:{patch.id}: target module file does not exist: {patch.target_file}"
+                )
+            if source_path not in included_module_sources:
+                raise BuildError(
+                    f"{module.id}:{patch.id}: target module file is not included by build.dm_files "
+                    f"or build.test_files: {patch.target_file}"
+                )
+            if not patch_path.exists():
+                raise BuildError(
+                    f"{local_patch.manifest_path}: patch file does not exist: {patch.file}"
+                )
+            try:
+                source_path.relative_to(module_root)
+            except ValueError as exc:
+                raise BuildError(f"{module.id}:{patch.id}: target escapes module root") from exc
+            try:
+                patch_path.relative_to(config_root)
+            except ValueError as exc:
+                raise BuildError(f"{module.id}:{patch.id}: patch file escapes config dir") from exc
+
+            if source_path not in buffers:
+                buffers[source_path] = source_path.read_text(encoding="utf-8")
+            content = patch_path.read_text(encoding="utf-8")
+            patched, anchor_line = apply_patch_text(buffers[source_path], patch, content)
+            buffers[source_path] = patched
+
+            output_path = module_patched_dir / module.id / patch.target_file
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(patched, encoding="utf-8", newline="\n")
+            outputs_by_source[source_path] = output_path
+
+            source_file = _path_for_index(host_root, source_path)
+            applied.append(
+                AppliedModulePatch(
+                    module_id=module.id,
+                    patch_id=patch.id,
+                    target_file=patch.target_file,
+                    source_file=source_file,
+                    output_file=str(output_path.relative_to(host.build.build_dir)),
+                    mode=patch.mode,
+                    anchor=patch.anchor,
+                    anchor_line=anchor_line,
+                    occurrence=patch.occurrence,
+                    risk=patch.risk,
+                )
+            )
+
+    return applied, outputs_by_source
 
 
 def _apply_patches(host: HostConfig, graph: ResolvedGraph, patched_dir: Path) -> list[AppliedPatch]:
@@ -203,6 +355,7 @@ def _build_index(
     dm_files: list[tuple[ModuleManifest, Path]],
     test_files: list[tuple[ModuleManifest, Path]],
     applied_patches: list[AppliedPatch],
+    applied_module_patches: list[AppliedModulePatch],
     include_file: Path,
     tests_file: Path,
     config_file: Path,
@@ -223,6 +376,21 @@ def _build_index(
                         "description": hook.description,
                     }
                 )
+
+    for patch in applied_module_patches:
+        files.setdefault(patch.source_file, []).append(
+            {
+                "kind": "module_patch",
+                "module": patch.module_id,
+                "id": patch.patch_id,
+                "target_file": patch.target_file,
+                "mode": patch.mode,
+                "anchor": patch.anchor,
+                "anchor_line": patch.anchor_line,
+                "output_file": patch.output_file,
+                "risk": patch.risk,
+            }
+        )
 
     for patch in applied_patches:
         files.setdefault(patch.target_file, []).append(
@@ -254,6 +422,9 @@ def _build_index(
             "test_files": [_path_for_index(host.root, path) for mod, path in test_files if mod.id == module.id],
             "hooks": [hook.__dict__ for hook in module.hooks],
             "patches": [patch.__dict__ for patch in module.patches],
+            "local_module_patches": [
+                patch.__dict__ for patch in applied_module_patches if patch.module_id == module.id
+            ],
         }
 
     return {

@@ -105,6 +105,60 @@ class PrepareTests(unittest.TestCase):
             self.assertIn("dynamic_module_trip_system_movement_hook(src)", patched_text)
             self.assertIn("dynamic_module_trip_addon_hook(src)", patched_text)
 
+    def test_local_module_patch_materializes_and_rewrites_include(self) -> None:
+        source = Path(__file__).resolve().parents[1] / "examples" / "host_tgstation"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "host"
+            shutil.copytree(source, root)
+            patch_dir = root / "config" / "dynamic_modules" / "patches" / "trip-system"
+            patch_dir.mkdir(parents=True)
+            (patch_dir / "patches.toml").write_text(
+                "\n".join(
+                    [
+                        "[[patches]]",
+                        'module = "trip-system"',
+                        'id = "server-trip-extra-state"',
+                        'target_file = "code/trip_system.dm"',
+                        'mode = "insert_after"',
+                        'anchor = "var/trip_chance = 5"',
+                        'file = "extra_state.dm"',
+                        'risk = "server_local"',
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (patch_dir / "extra_state.dm").write_text(
+                "\tvar/server_override = TRUE\n",
+                encoding="utf-8",
+            )
+
+            host = load_host_config(root)
+            graph = resolve_modules(discover_manifests(host))
+            result = prepare_build(host, graph, write_lock=False)
+            include_text = result.include_path.read_text(encoding="utf-8")
+            patched = root / ".dynamic_modules_build" / "module_patches" / "trip-system" / "code" / "trip_system.dm"
+            index = json.loads(result.index_path.read_text(encoding="utf-8"))
+
+            self.assertTrue(patched.exists())
+            self.assertIn("var/server_override = TRUE", patched.read_text(encoding="utf-8"))
+            self.assertIn(
+                '#include "../module_patches/trip-system/code/trip_system.dm"',
+                include_text,
+            )
+            self.assertNotIn(
+                '#include "../../dynamic_modules/installed/trip-system/code/trip_system.dm"',
+                include_text,
+            )
+
+            source_key = "dynamic_modules/installed/trip-system/code/trip_system.dm"
+            interactions = index["files"][source_key]
+            self.assertTrue(any(item["kind"] == "module_patch" for item in interactions))
+            self.assertEqual(
+                index["modules"]["trip-system"]["dm_files"],
+                [".dynamic_modules_build/module_patches/trip-system/code/trip_system.dm"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

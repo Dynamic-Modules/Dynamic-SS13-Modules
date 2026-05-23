@@ -27,6 +27,7 @@ This repo contains the first working framework slice:
 - generated DM include and unit-test include manifests
 - module config defaults and host override export
 - structured patch materialization into disposable build output
+- server-local module source patch overlays
 - machine-readable `.dynamic_modules_build/index.json`
 - `doctor`, `explain`, and `test-plan` maintainer commands
 - a VS Code extension scaffold that reads the generated index

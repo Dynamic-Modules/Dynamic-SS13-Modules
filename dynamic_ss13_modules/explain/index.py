@@ -40,6 +40,12 @@ def explain_file(index: dict[str, Any], file_value: str) -> list[str]:
                 f"({item.get('mode')} anchor {item.get('anchor')!r})"
             )
             lines.append(f"  materialized output: {item.get('output_file')}")
+        elif kind == "module_patch":
+            lines.append(
+                f"- local module patch {module}:{item_id} at line {item.get('anchor_line')} "
+                f"({item.get('mode')} anchor {item.get('anchor')!r})"
+            )
+            lines.append(f"  materialized module source: {item.get('output_file')}")
         elif kind == "hook":
             lines.append(
                 f"- hook {module}:{item_id} targets {item.get('target')} "
@@ -59,4 +65,3 @@ def module_summary(index: dict[str, Any]) -> list[str]:
         module = modules.get(module_id, {})
         lines.append(f"{index_number}. {module_id} {module.get('version', '')} - {module.get('name', '')}")
     return lines
-
