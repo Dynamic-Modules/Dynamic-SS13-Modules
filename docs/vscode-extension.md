@@ -1,23 +1,25 @@
-# VS Code Extension
+# VS Code Extension Integration
 
-The VS Code extension reads `.dynamic_modules_build/index.json`. It does not
-resolve modules itself.
+The VS Code extension now lives in its own repository:
 
-Planned and scaffolded features:
+```text
+https://github.com/Dynamic-Modules/VS-Code-Extensions
+```
 
-- Activity Bar view for enabled modules
-- refresh command
-- explain current file command
-- open generated index command
-- CodeLens banner when a host file has module interactions
-- hover details for files touched by hooks or patches
+The extension reads `.dynamic_modules_build/index.json`. It does not resolve
+modules itself, and it should remain a thin UI over framework output. If editor
+tooling needs more structured data, add that data to the generated index rather
+than duplicating resolver, patch, or manifest logic in JavaScript.
 
-The extension should remain a thin UI over CLI output. If a detail is missing,
-add it to `index.json` rather than duplicating resolver logic in JavaScript.
+## Generated workspace
 
-## Multi-root module editing
+The framework still owns workspace generation:
 
-A future command should generate a `.code-workspace` containing the host repo
-and every installed module root. That gives maintainers smooth editing without
-opening twenty separate VS Code windows.
+```bash
+dynamic-modules workspace-generate
+```
 
+This creates `.dynamic_modules_build/dynamic-modules.code-workspace` with the
+host repo and all resolved module roots. The VS Code extension can open that
+workspace or add individual module roots to the current workspace for smoother
+module maintenance.

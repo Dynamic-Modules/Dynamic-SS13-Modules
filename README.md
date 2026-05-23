@@ -30,7 +30,7 @@ This repo contains the first working framework slice:
 - server-local module source patch overlays
 - machine-readable `.dynamic_modules_build/index.json`
 - `doctor`, `explain`, and `test-plan` maintainer commands
-- a VS Code extension scaffold that reads the generated index
+- generated editor metadata consumed by the dedicated VS Code extension
 
 ## Quick start
 
@@ -55,7 +55,7 @@ submodule gitlinks, and `dynamic_modules.lock.json`; do not commit
 - [Hooks and patches](docs/hooks-and-patches.md)
 - [TGS integration](docs/tgs-integration.md)
 - [Maintainer workflows](docs/maintainer-workflows.md)
-- [VS Code extension plan](docs/vscode-extension.md)
+- [VS Code extension integration](docs/vscode-extension.md)
 
 ## Development
 
