@@ -21,24 +21,27 @@ class AppliedPatch:
 
 
 def apply_patch_text(source: str, patch: PatchSpec, content: str) -> tuple[str, int]:
-    matches = _find_anchor_lines(source, patch.anchor)
+    matches = _find_anchor_spans(source, patch.anchor)
     if len(matches) < patch.occurrence:
         raise BuildError(
             f"{patch.id}: anchor {patch.anchor!r} occurrence {patch.occurrence} not found"
         )
-    line_index = matches[patch.occurrence - 1]
-    lines = source.splitlines(keepends=True)
-    patch_lines = _ensure_trailing_newline(content).splitlines(keepends=True)
+    span = matches[patch.occurrence - 1]
 
     if patch.mode == "insert_before":
-        output = lines[:line_index] + patch_lines + lines[line_index:]
+        output = source[: span.start] + _line_mode_content(content, patch.anchor) + source[span.start :]
     elif patch.mode == "insert_after":
-        output = lines[: line_index + 1] + patch_lines + lines[line_index + 1 :]
+        output = source[: span.end] + _line_mode_content(content, patch.anchor) + source[span.end :]
     elif patch.mode == "replace":
-        output = lines[:line_index] + patch_lines + lines[line_index + 1 :]
+        output = source[: span.start] + _line_mode_content(content, patch.anchor) + source[span.end :]
+    elif patch.mode == "replace_between":
+        end_span = _find_first_anchor_span_after(source, patch.end_anchor or "", span.end)
+        if end_span is None:
+            raise BuildError(f"{patch.id}: end_anchor {patch.end_anchor!r} not found after anchor")
+        output = source[: span.end] + content + source[end_span.start :]
     else:
         raise BuildError(f"{patch.id}: unsupported patch mode {patch.mode}")
-    return "".join(output), line_index + 1
+    return output, span.line
 
 
 def apply_patch_to_file(
@@ -83,16 +86,53 @@ def apply_patch_to_file(
     )
 
 
-def _find_anchor_lines(source: str, anchor: str) -> list[int]:
-    matches: list[int] = []
-    for index, line in enumerate(source.splitlines(keepends=True)):
+@dataclass(frozen=True)
+class AnchorSpan:
+    start: int
+    end: int
+    line: int
+
+
+def _find_anchor_spans(source: str, anchor: str) -> list[AnchorSpan]:
+    if "\n" in anchor:
+        return _find_block_anchor_spans(source, anchor)
+    return _find_line_anchor_spans(source, anchor)
+
+
+def _find_line_anchor_spans(source: str, anchor: str) -> list[AnchorSpan]:
+    matches: list[AnchorSpan] = []
+    offset = 0
+    for line_number, line in enumerate(source.splitlines(keepends=True), start=1):
+        line_end = offset + len(line)
         if anchor in line:
-            matches.append(index)
+            matches.append(AnchorSpan(start=offset, end=line_end, line=line_number))
+        offset = line_end
     return matches
 
 
-def _ensure_trailing_newline(value: str) -> str:
-    if value.endswith("\n"):
-        return value
-    return value + "\n"
+def _find_block_anchor_spans(source: str, anchor: str) -> list[AnchorSpan]:
+    matches: list[AnchorSpan] = []
+    index = source.find(anchor)
+    while index != -1:
+        matches.append(
+            AnchorSpan(
+                start=index,
+                end=index + len(anchor),
+                line=source.count("\n", 0, index) + 1,
+            )
+        )
+        index = source.find(anchor, index + max(1, len(anchor)))
+    return matches
 
+
+def _find_first_anchor_span_after(source: str, anchor: str, offset: int) -> AnchorSpan | None:
+    for span in _find_anchor_spans(source, anchor):
+        if span.start >= offset:
+            return span
+    return None
+
+
+def _line_mode_content(content: str, anchor: str) -> str:
+    if content == "" or "\n" in anchor or content.endswith("\n"):
+        return content
+    return content + "\n"

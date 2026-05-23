@@ -19,6 +19,7 @@ Supported modes:
 - `insert_before`
 - `insert_after`
 - `replace`
+- `replace_between`
 
 Each patch needs:
 
@@ -28,6 +29,17 @@ Each patch needs:
 - anchor text
 - source patch file
 - occurrence number
+
+Anchors may be a single line or a multiline block. Single-line anchors keep the
+legacy behavior: `insert_before`, `insert_after`, and `replace` operate on the
+entire line containing the anchor. Multiline anchors match an exact text block,
+which lets generated tools replace larger hunks without converting an entire
+file into module-owned source. The `occurrence` field selects which matching
+line or block to use.
+
+`replace_between` uses `anchor` as the start anchor and `end_anchor` as the
+first matching end anchor after it. The generated content replaces the text
+between those anchors while leaving both anchor lines or blocks in place.
 
 During `prepare`, patches materialize into `.dynamic_modules_build/patched/`.
 The host checkout is not modified.
@@ -71,10 +83,12 @@ Local module patches only apply to files that are explicitly matched by the
 module's `build.dm_files` or `build.test_files`; otherwise the build fails so
 servers do not accidentally create a patch that never compiles.
 
-## Future BYOND-aware patching
+## BYOND-aware patching direction
 
-The first implementation anchors on text lines. A later patch engine should be
-able to target BYOND types and procs directly, for example:
+Dynamic DM owns maintainer tooling that can infer these text/block patches from
+real downstream DM edits and verify that applying them to a base file recreates
+the edited file. A later patch engine can build on that and target BYOND types
+and procs directly, for example:
 
 ```toml
 target = "/mob/living/carbon/human/proc/Move"

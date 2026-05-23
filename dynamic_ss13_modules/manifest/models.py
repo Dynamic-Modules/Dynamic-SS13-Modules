@@ -177,6 +177,7 @@ class PatchSpec:
     mode: str
     anchor: str
     file: str
+    end_anchor: str | None = None
     occurrence: int = 1
     risk: str = "escape_hatch"
     description: str | None = None
@@ -195,17 +196,24 @@ class PatchSpec:
         description = raw.get("description")
         if description is not None and not isinstance(description, str):
             raise ValidationError(f"{path}: patch.description must be a string")
+        end_anchor = raw.get("end_anchor")
+        if end_anchor is not None and not isinstance(end_anchor, str):
+            raise ValidationError(f"{path}: patch.end_anchor must be a string")
         mode = raw["mode"]
-        if mode not in {"insert_before", "insert_after", "replace"}:
+        if mode not in {"insert_before", "insert_after", "replace", "replace_between"}:
             raise ValidationError(
-                f"{path}: patch.mode must be insert_before, insert_after, or replace"
+                f"{path}: patch.mode must be insert_before, insert_after, replace, "
+                "or replace_between"
             )
+        if mode == "replace_between" and not end_anchor:
+            raise ValidationError(f"{path}: patch.end_anchor is required for replace_between")
         return cls(
             id=raw["id"],
             target_file=raw["target_file"],
             mode=mode,
             anchor=raw["anchor"],
             file=raw["file"],
+            end_anchor=end_anchor,
             occurrence=occurrence,
             risk=risk,
             description=description,
