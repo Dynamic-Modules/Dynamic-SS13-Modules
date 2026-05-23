@@ -159,6 +159,57 @@ class PrepareTests(unittest.TestCase):
                 [".dynamic_modules_build/module_patches/trip-system/code/trip_system.dm"],
             )
 
+    def test_tgui_files_are_indexed_and_dynamic_tgui_wrapper_is_generated(self) -> None:
+        source = Path(__file__).resolve().parents[1] / "examples" / "host_tgstation"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "host"
+            shutil.copytree(source, root)
+            dynamic_tgui = root / "dynamic_modules" / "installed" / "dynamic-tgui"
+            (dynamic_tgui / "tools").mkdir(parents=True)
+            (dynamic_tgui / "tools" / "cli.ts").write_text("export {};\n", encoding="utf-8")
+            (dynamic_tgui / "dynamic-tgui.module.toml").write_text(
+                "\n".join(
+                    [
+                        'id = "dynamic-tgui"',
+                        'name = "Dynamic TGUI"',
+                        'version = "1.0.0"',
+                        'module_api = "1"',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            tgui_module = root / "dynamic_modules" / "installed" / "trip-system" / "tgui"
+            tgui_module.mkdir()
+            (tgui_module / "trip_panel.tgui.ts").write_text(
+                "export const modularTgui = true;\n", encoding="utf-8"
+            )
+            manifest_path = root / "dynamic_modules" / "installed" / "trip-system" / "trip-system.module.toml"
+            manifest_path.write_text(
+                manifest_path.read_text(encoding="utf-8")
+                .replace('test_files = ["tests/**/*.dm"]', 'test_files = ["tests/**/*.dm"]\ntgui = ["tgui/**/*.tgui.ts"]'),
+                encoding="utf-8",
+            )
+
+            host = load_host_config(root)
+            graph = resolve_modules(discover_manifests(host))
+            result = prepare_build(host, graph, write_lock=False)
+            index = json.loads(result.index_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(
+                index["modules"]["trip-system"]["tgui_files"],
+                ["dynamic_modules/installed/trip-system/tgui/trip_panel.tgui.ts"],
+            )
+            self.assertEqual(
+                index["generated"]["tgui_cli_file"],
+                ".dynamic_modules_build/tgui/cli.ts",
+            )
+            self.assertTrue(result.tgui_cli_path and result.tgui_cli_path.exists())
+            self.assertIn(
+                "../../dynamic_modules/installed/dynamic-tgui/tools/cli.ts",
+                result.tgui_cli_path.read_text(encoding="utf-8"),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

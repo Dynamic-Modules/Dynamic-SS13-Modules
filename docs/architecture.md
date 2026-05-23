@@ -32,7 +32,8 @@ It intentionally keeps generated files out of the normal Git history.
 5. Generated build layer
 
    `.dynamic_modules_build/` contains generated include files, config exports,
-   patch overlays, and `index.json`. It is disposable and should be gitignored.
+   patch overlays, optional tgui build wrappers, and `index.json`. It is
+   disposable and should be gitignored.
 
 ## Standard flow
 
@@ -45,6 +46,7 @@ scan -> validate -> resolve -> prepare -> compile/test
 - `.dynamic_modules_build/generated/_dynamic_modules_includes.dm`
 - `.dynamic_modules_build/generated/_dynamic_modules_tests.dm`
 - `.dynamic_modules_build/generated/dynamic_modules_config.json`
+- `.dynamic_modules_build/tgui/cli.ts` when `dynamic-tgui` is installed
 - `.dynamic_modules_build/index.json`
 - `.dynamic_modules_build/patched/...` when patches are used
 
@@ -60,4 +62,3 @@ module-specific output stays generated.
 - Make every generated change explainable by module id, manifest path, source
   commit, and hook or patch id.
 - Keep TGS and CI integration noninteractive.
-
