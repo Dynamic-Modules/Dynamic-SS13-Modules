@@ -10,7 +10,7 @@ default_branch = "main"
 
 [compat]
 target = "tgstation"
-minimum_dynamic_modules = "0.1.0"
+minimum_dynamic_modules = "1.0.0"
 
 [load]
 load_after = ["movement-hooks"]
@@ -40,4 +40,3 @@ anchor = ". = ..()"
 file = "patches/human_move_trip_check.dm"
 occurrence = 1
 risk = "escape_hatch"
-

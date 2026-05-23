@@ -14,9 +14,9 @@ Exact resolved module state lives in dynamic_modules.lock.json.
 Everything generated is traceable back to a manifest entry.
 ```
 
-## Current implementation
+## 1.0 scope
 
-This repo contains the first working framework slice:
+This repo contains the stable 1.0 framework surface:
 
 - Python CLI exposed as `dynamic-modules`
 - host config loading from `dynamic_modules.toml`
@@ -58,6 +58,7 @@ submodule gitlinks, and `dynamic_modules.lock.json`; do not commit
 - [TGS integration](docs/tgs-integration.md)
 - [Maintainer workflows](docs/maintainer-workflows.md)
 - [VS Code extension integration](docs/vscode-extension.md)
+- [1.0 release checklist](docs/1.0-release.md)
 
 ## Development
 
@@ -71,4 +72,5 @@ Run the CLI directly from a checkout:
 
 ```bash
 python3 -m dynamic_ss13_modules --help
+python3 -m dynamic_ss13_modules --version
 ```

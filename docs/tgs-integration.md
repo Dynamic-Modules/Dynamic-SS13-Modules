@@ -31,12 +31,10 @@ Unit-test builds can include:
 #include ".dynamic_modules_build/generated/_dynamic_modules_tests.dm"
 ```
 
-The exact bootstrap location should be chosen per downstream. For SPLURT, this
-belongs on the `dynamic-module-system-hook` branch after the framework is pushed
-and consumable.
+The exact bootstrap location should be chosen per downstream. Keep this as a
+small downstream-owned hook so module updates can remain generated output.
 
 ## Generated files
 
 `.dynamic_modules_build/` should be ignored by Git. It is safe to delete and
 regenerate.
-

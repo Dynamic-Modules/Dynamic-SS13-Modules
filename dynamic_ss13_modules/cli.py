@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from dynamic_ss13_modules import __version__
 from dynamic_ss13_modules.build import prepare_build
 from dynamic_ss13_modules.errors import DynamicModulesError
 from dynamic_ss13_modules.explain import explain_file, load_index, module_summary
@@ -41,6 +42,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         default=None,
         help="host config path (default: <root>/dynamic_modules.toml)",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     subparsers = parser.add_subparsers(required=True)
 

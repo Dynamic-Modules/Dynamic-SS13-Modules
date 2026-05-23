@@ -15,7 +15,7 @@ default_branch = "main"
 
 [compat]
 target = "tgstation"
-minimum_dynamic_modules = "0.1.0"
+minimum_dynamic_modules = "1.0.0"
 
 [load]
 requires = ["example-module >= 1.0.0"]

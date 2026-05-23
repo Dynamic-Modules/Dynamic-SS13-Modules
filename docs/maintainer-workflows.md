@@ -85,3 +85,16 @@ dynamic-modules workspace-generate
 
 This creates `.dynamic_modules_build/dynamic-modules.code-workspace` with the
 host repo and all resolved module roots.
+
+## Edit generated final files and convert back to a module
+
+Use the VS Code extension for authoring sessions:
+
+1. Run `Dynamic Modules: Generate Authoring Workspace`.
+2. Pick the final files to edit.
+3. Edit the copies under `.dynamic_modules_authoring/<session>/files`.
+4. Run `Dynamic Modules: Deconvert Authoring Workspace`.
+5. Run `Dynamic Modules: Prepare` and inspect the generated output.
+
+This workflow is for maintainer convenience. The committed result should be the
+new or updated module, not the generated authoring session.
