@@ -40,6 +40,24 @@ class ResolverTests(unittest.TestCase):
             with self.assertRaises(ResolveError):
                 resolve_modules(discover_manifests(load_host_config(root)))
 
+    def test_unsupported_module_api_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_host(root)
+            _write_module(root, "future", "1.0.0", module_api="999")
+
+            with self.assertRaisesRegex(ResolveError, "module_api 999"):
+                resolve_modules(discover_manifests(load_host_config(root)))
+
+    def test_minimum_framework_version_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_host(root)
+            _write_module(root, "future", "1.0.0", minimum_dynamic_modules="999.0.0")
+
+            with self.assertRaisesRegex(ResolveError, "requires Dynamic SS13 Modules"):
+                resolve_modules(discover_manifests(load_host_config(root)))
+
 
 def _write_host(root: Path) -> None:
     (root / "dynamic_modules").mkdir(parents=True)
@@ -55,6 +73,8 @@ def _write_module(
     version: str,
     requires: list[str] | None = None,
     load_after: list[str] | None = None,
+    module_api: str = "1",
+    minimum_dynamic_modules: str | None = None,
 ) -> None:
     module_root = root / "dynamic_modules" / module_id
     module_root.mkdir(parents=True)
@@ -62,10 +82,16 @@ def _write_module(
         f'id = "{module_id}"',
         f'name = "{module_id}"',
         f'version = "{version}"',
-        'module_api = "1"',
+        f'module_api = "{module_api}"',
+        "",
+        "[compat]",
+    ]
+    if minimum_dynamic_modules:
+        lines.append(f'minimum_dynamic_modules = "{minimum_dynamic_modules}"')
+    lines.extend([
         "",
         "[load]",
-    ]
+    ])
     if requires:
         lines.append("requires = [" + ", ".join(f'"{item}"' for item in requires) + "]")
     if load_after:
@@ -78,4 +104,3 @@ def _write_module(
 
 if __name__ == "__main__":
     unittest.main()
-

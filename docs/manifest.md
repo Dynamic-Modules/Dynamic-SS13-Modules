@@ -78,6 +78,15 @@ constraint.
 `load_after` and `load_before` are ordering hints. Missing hint targets produce
 warnings, not hard failures.
 
+## Framework compatibility
+
+`module_api` is the manifest contract version. Dynamic SS13 Modules 1.0 supports
+`module_api = "1"` and fails resolution for unknown API versions.
+
+`compat.minimum_dynamic_modules` is optional, but recommended for published
+modules. When present, resolution fails if the host framework version is older
+than the declared minimum.
+
 ## Prepare plugins
 
 `[[prepare_plugins]]` lets a module run a small build-time integration step

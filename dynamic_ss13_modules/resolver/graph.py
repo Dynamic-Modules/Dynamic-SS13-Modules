@@ -3,9 +3,12 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from dynamic_ss13_modules.errors import ResolveError
+from dynamic_ss13_modules import __version__
+from dynamic_ss13_modules.errors import ResolveError, ValidationError
 from dynamic_ss13_modules.manifest.models import ModuleManifest
-from dynamic_ss13_modules.resolver.versioning import parse_requirement, satisfies
+from dynamic_ss13_modules.resolver.versioning import parse_requirement, satisfies, version_tuple
+
+SUPPORTED_MODULE_API = "1"
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,7 @@ def resolve_modules(manifests: list[ModuleManifest]) -> ResolvedGraph:
 
     edges: list[GraphEdge] = []
     for manifest in modules.values():
+        _check_framework_compat(manifest, errors)
         _check_requires(manifest, modules, edges, errors)
         _check_optional(manifest, modules, edges)
         _check_conflicts(manifest, modules, errors)
@@ -57,6 +61,26 @@ def resolve_modules(manifests: list[ModuleManifest]) -> ResolvedGraph:
         edges=sorted(edges, key=lambda edge: (edge.before, edge.after, edge.reason)),
         warnings=warnings,
     )
+
+
+def _check_framework_compat(manifest: ModuleManifest, errors: list[str]) -> None:
+    if manifest.module_api != SUPPORTED_MODULE_API:
+        errors.append(
+            f"{manifest.id}: module_api {manifest.module_api} is not supported "
+            f"by Dynamic SS13 Modules {__version__} (supported: {SUPPORTED_MODULE_API})"
+        )
+
+    minimum = manifest.compat.minimum_dynamic_modules
+    if not minimum:
+        return
+    try:
+        if version_tuple(__version__) < version_tuple(minimum):
+            errors.append(
+                f"{manifest.id}: requires Dynamic SS13 Modules >= {minimum}, "
+                f"but framework is {__version__}"
+            )
+    except ValidationError as exc:
+        errors.append(f"{manifest.id}: invalid compat.minimum_dynamic_modules {minimum!r}: {exc}")
 
 
 def _check_requires(
@@ -144,4 +168,3 @@ def _topological_sort(modules: dict[str, ModuleManifest], edges: list[GraphEdge]
         cycle = sorted(module_id for module_id, count in incoming_count.items() if count > 0)
         raise ResolveError(f"module load-order cycle detected involving: {', '.join(cycle)}")
     return result
-
