@@ -167,6 +167,40 @@ class PrepareTests(unittest.TestCase):
             dynamic_tgui = root / "dynamic_modules" / "installed" / "dynamic-tgui"
             (dynamic_tgui / "tools").mkdir(parents=True)
             (dynamic_tgui / "tools" / "cli.ts").write_text("export {};\n", encoding="utf-8")
+            (dynamic_tgui / "prepare_plugin.py").write_text(
+                "\n".join(
+                    [
+                        "import json",
+                        "import os",
+                        "from pathlib import Path",
+                        "",
+                        "context = json.loads(Path(os.environ['DYNAMIC_MODULES_PREPARE_CONTEXT']).read_text(encoding='utf-8'))",
+                        "host_root = Path(os.environ['DYNAMIC_MODULES_HOST_ROOT'])",
+                        "build_dir = Path(os.environ['DYNAMIC_MODULES_BUILD_DIR'])",
+                        "wrapper = build_dir / 'tgui' / 'cli.ts'",
+                        "module_root = host_root / context['modules']['dynamic-tgui']['root']",
+                        "wrapper.parent.mkdir(parents=True, exist_ok=True)",
+                        "module_cli = os.path.relpath(module_root / 'tools' / 'cli.ts', wrapper.parent).replace(os.sep, '/')",
+                        "wrapper.write_text('\\n'.join([",
+                        "    '#!/usr/bin/env bun',",
+                        "    '// test wrapper',",
+                        "    f'await import({module_cli!r});',",
+                        "    '',",
+                        "]), encoding='utf-8', newline='\\n')",
+                        "output = {",
+                        "    'generated': {'tgui_cli_file': wrapper.relative_to(host_root).as_posix()},",
+                        "    'files': {",
+                        "        'tgui/package.json': [",
+                        "            {'kind': 'prepare_plugin', 'module': 'dynamic-tgui', 'id': 'dynamic-tgui-cli-wrapper'}",
+                        "        ]",
+                        "    },",
+                        "}",
+                        "Path(os.environ['DYNAMIC_MODULES_PREPARE_OUTPUT']).write_text(json.dumps(output), encoding='utf-8')",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (dynamic_tgui / "dynamic-tgui.module.toml").write_text(
                 "\n".join(
                     [
@@ -174,6 +208,11 @@ class PrepareTests(unittest.TestCase):
                         'name = "Dynamic TGUI"',
                         'version = "1.0.0"',
                         'module_api = "1"',
+                        "",
+                        "[[prepare_plugins]]",
+                        'id = "dynamic-tgui-cli-wrapper"',
+                        'command = "python3"',
+                        'args = ["prepare_plugin.py"]',
                         "",
                     ]
                 ),
@@ -204,10 +243,20 @@ class PrepareTests(unittest.TestCase):
                 index["generated"]["tgui_cli_file"],
                 ".dynamic_modules_build/tgui/cli.ts",
             )
-            self.assertTrue(result.tgui_cli_path and result.tgui_cli_path.exists())
+            self.assertEqual(len(result.plugin_output_paths), 1)
+            self.assertTrue(result.plugin_context_path.exists())
+            tgui_cli_path = root / index["generated"]["tgui_cli_file"]
+            self.assertTrue(tgui_cli_path.exists())
             self.assertIn(
                 "../../dynamic_modules/installed/dynamic-tgui/tools/cli.ts",
-                result.tgui_cli_path.read_text(encoding="utf-8"),
+                tgui_cli_path.read_text(encoding="utf-8"),
+            )
+            self.assertEqual(
+                index["prepare_plugins"][0]["id"],
+                "dynamic-tgui-cli-wrapper",
+            )
+            self.assertTrue(
+                any(item["kind"] == "prepare_plugin" for item in index["files"]["tgui/package.json"])
             )
 
 

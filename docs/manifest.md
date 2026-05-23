@@ -30,6 +30,12 @@ test_files = ["tests/**/*.dm"]
 assets = ["icons/**/*.dmi", "sound/**/*.ogg"]
 tgui = ["tgui/**/*.tgui.ts"]
 
+[[prepare_plugins]]
+id = "trip-build-metadata"
+command = "python3"
+args = ["tools/prepare_plugin.py"]
+description = "Writes extra build metadata consumed by this module."
+
 [config]
 schema = "config/config.schema.json"
 defaults = "config/default.toml"
@@ -72,6 +78,64 @@ constraint.
 `load_after` and `load_before` are ordering hints. Missing hint targets produce
 warnings, not hard failures.
 
+## Prepare plugins
+
+`[[prepare_plugins]]` lets a module run a small build-time integration step
+during `dynamic-modules prepare`. Plugins run in resolved module load order
+after core DM/test/config/patch materialization and before the final
+`.dynamic_modules_build/index.json` is written.
+
+The plugin command runs with its working directory set to the module root.
+Arguments are passed exactly as listed in the manifest, so relative script
+paths resolve naturally from that module root.
+
+The framework passes these environment variables:
+
+```text
+DYNAMIC_MODULES_PREPARE_API=1
+DYNAMIC_MODULES_PREPARE_CONTEXT=/absolute/path/to/.dynamic_modules_build/prepare_plugins/context.json
+DYNAMIC_MODULES_PREPARE_OUTPUT=/absolute/path/to/.dynamic_modules_build/prepare_plugins/<module>__<plugin>.json
+DYNAMIC_MODULES_PREPARE_PLUGIN_ID=<plugin id>
+DYNAMIC_MODULES_PREPARE_PLUGIN_MODULE=<module id>
+DYNAMIC_MODULES_HOST_ROOT=/absolute/path/to/host
+DYNAMIC_MODULES_BUILD_DIR=/absolute/path/to/host/.dynamic_modules_build
+DYNAMIC_MODULES_INDEX=/absolute/path/to/host/.dynamic_modules_build/index.json
+```
+
+The context JSON contains `api_version`, host/build paths, `load_order`, and
+per-module metadata including collected `dm_files`, `test_files`, `tgui_files`,
+`asset_files`, hooks, patches, and plugin declarations.
+
+The plugin must write a JSON object to `DYNAMIC_MODULES_PREPARE_OUTPUT`:
+
+```json
+{
+  "generated": {
+    "example_file": ".dynamic_modules_build/generated/example.json"
+  },
+  "modules": {
+    "trip-system": {
+      "extra_metadata": ["value"]
+    }
+  },
+  "files": {
+    "code/example.dm": [
+      {
+        "kind": "prepare_plugin",
+        "module": "trip-system",
+        "id": "trip-build-metadata"
+      }
+    ]
+  },
+  "warnings": []
+}
+```
+
+All top-level fields are optional. `generated` is merged into
+`index.generated`, `modules` is merged into matching `index.modules` entries,
+`files` adds explainable interactions to `index.files`, and `warnings` are
+prefixed with the owning module/plugin id.
+
 ## TGUI overlays
 
 `build.tgui` lists module-owned Dynamic TGUI manifest files. During `prepare`,
@@ -89,6 +153,5 @@ requires = ["dynamic-tgui"]
 tgui = ["tgui/**/*.tgui.ts"]
 ```
 
-When `dynamic-tgui` is installed, `prepare` also emits
-`.dynamic_modules_build/tgui/cli.ts`, a stable wrapper for host
-`tgui/package.json` scripts.
+Dynamic TGUI owns its prepare plugin and emits `.dynamic_modules_build/tgui/cli.ts`,
+a stable wrapper for host `tgui/package.json` scripts.

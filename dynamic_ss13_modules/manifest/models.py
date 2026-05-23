@@ -92,6 +92,32 @@ class BuildSpec:
 
 
 @dataclass(frozen=True)
+class PreparePluginSpec:
+    id: str
+    command: str
+    args: list[str] = field(default_factory=list)
+    description: str | None = None
+
+    @classmethod
+    def from_raw(cls, raw: dict[str, Any], path: Path) -> "PreparePluginSpec":
+        if not isinstance(raw, dict):
+            raise ValidationError(f"{path}: prepare_plugins entries must be tables")
+        for key in ("id", "command"):
+            if not isinstance(raw.get(key), str) or not raw[key].strip():
+                raise ValidationError(f"{path}: prepare_plugin.{key} must be a non-empty string")
+        args = _string_list(raw.get("args"), "prepare_plugin.args", path)
+        description = raw.get("description")
+        if description is not None and not isinstance(description, str):
+            raise ValidationError(f"{path}: prepare_plugin.description must be a string")
+        return cls(
+            id=raw["id"],
+            command=raw["command"],
+            args=args,
+            description=description,
+        )
+
+
+@dataclass(frozen=True)
 class ConfigSpec:
     schema: str | None = None
     defaults: str | None = None
@@ -200,6 +226,7 @@ class ModuleManifest:
     load: LoadSpec
     build: BuildSpec
     config: ConfigSpec
+    prepare_plugins: list[PreparePluginSpec]
     hooks: list[HookSpec]
     patches: list[PatchSpec]
     raw: dict[str, Any]
@@ -219,12 +246,18 @@ class ModuleManifest:
         load = LoadSpec.from_raw(_table(raw.get("load"), "load", manifest_path), manifest_path)
         build = BuildSpec.from_raw(_table(raw.get("build"), "build", manifest_path), manifest_path)
         config = ConfigSpec.from_raw(_table(raw.get("config"), "config", manifest_path))
+        prepare_plugins_raw = raw.get("prepare_plugins", [])
         hooks_raw = raw.get("hooks", [])
         patches_raw = raw.get("patches", [])
+        if not isinstance(prepare_plugins_raw, list):
+            raise ValidationError(f"{manifest_path}: prepare_plugins must be an array of tables")
         if not isinstance(hooks_raw, list):
             raise ValidationError(f"{manifest_path}: hooks must be an array of tables")
         if not isinstance(patches_raw, list):
             raise ValidationError(f"{manifest_path}: patches must be an array of tables")
+        prepare_plugins = [
+            PreparePluginSpec.from_raw(item, manifest_path) for item in prepare_plugins_raw
+        ]
         hooks = [HookSpec.from_raw(item, manifest_path) for item in hooks_raw]
         patches = [PatchSpec.from_raw(item, manifest_path) for item in patches_raw]
         return cls(
@@ -240,6 +273,7 @@ class ModuleManifest:
             load=load,
             build=build,
             config=config,
+            prepare_plugins=prepare_plugins,
             hooks=hooks,
             patches=patches,
             raw=raw,
@@ -279,4 +313,3 @@ class HostConfig:
     registries: list[RegistrySpec]
     update: UpdatePolicy
     build: HostBuildSpec
-

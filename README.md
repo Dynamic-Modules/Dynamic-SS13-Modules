@@ -26,8 +26,8 @@ This repo contains the first working framework slice:
 - deterministic lockfile generation
 - generated DM include and unit-test include manifests
 - module config defaults and host override export
-- indexed module tgui manifest files for Dynamic TGUI
-- generated Dynamic TGUI build wrapper when `dynamic-tgui` is installed
+- indexed module tgui and asset files
+- prepare plugin API for module-owned build-time integration
 - structured patch materialization into disposable build output
 - server-local module source patch overlays
 - machine-readable `.dynamic_modules_build/index.json`
